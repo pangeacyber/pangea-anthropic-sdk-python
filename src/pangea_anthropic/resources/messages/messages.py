@@ -973,8 +973,8 @@ class PangeaMessages(Messages):
         if guard_input_response.result.blocked:
             raise PangeaAIGuardBlockedError()
 
-        if guard_input_response.result.transformed and isinstance(guard_input_response.result.prompt_messages, list):
-            messages = guard_input_response.result.prompt_messages
+        if guard_input_response.result.transformed and guard_input_response.result.prompt_messages is not None:
+            messages = guard_input_response.result.prompt_messages  # type: ignore[assignment]
 
         anthropic_response = self._post(
             "/v1/messages",
@@ -1957,8 +1957,8 @@ class AsyncPangeaMessages(AsyncMessages):
         if guard_input_response.result.blocked:
             raise PangeaAIGuardBlockedError()
 
-        if guard_input_response.result.transformed and isinstance(guard_input_response.result.prompt_messages, list):
-            messages = guard_input_response.result.prompt_messages
+        if guard_input_response.result.transformed and guard_input_response.result.prompt_messages is not None:
+            messages = guard_input_response.result.prompt_messages  # type: ignore[assignment]
 
         anthropic_response = await self._post(
             "/v1/messages",
