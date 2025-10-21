@@ -12,7 +12,7 @@ dependencies = [
     "anthropic>=0.71.0",
     "anyio>=4.11.0",
     "httpx>=0.28.1",
-    "pangea-sdk>=6.7.0",
+    "pangea-sdk>=6.8.0",
     "typing-extensions>=4.15.0",
 ]
 
