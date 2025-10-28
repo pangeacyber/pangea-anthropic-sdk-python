@@ -13,7 +13,7 @@ from anthropic._streaming import AsyncStream, Stream
 from anthropic._types import Body, Headers, Query, SequenceNotStr
 from anthropic._utils import async_maybe_transform, is_given, maybe_transform, required_args
 from anthropic.resources.messages import DEPRECATED_MODELS, AsyncMessages, Messages
-from anthropic.types import ThinkingConfigParam, message_create_params
+from anthropic.types import TextBlock, ThinkingConfigParam, message_create_params
 from anthropic.types.message import Message
 from anthropic.types.message_param import MessageParam
 from anthropic.types.metadata_param import MetadataParam
@@ -23,6 +23,7 @@ from anthropic.types.text_block_param import TextBlockParam
 from anthropic.types.tool_choice_param import ToolChoiceParam
 from anthropic.types.tool_union_param import ToolUnionParam
 from pangea.services.ai_guard import Message as PangeaMessage
+from pydantic import TypeAdapter
 from typing_extensions import override
 
 from pangea_anthropic._exceptions import PangeaAIGuardBlockedError
@@ -31,6 +32,9 @@ if TYPE_CHECKING:
     from pangea_anthropic._client import AsyncPangeaAnthropic, PangeaAnthropic
 
 __all__ = ("PangeaMessages", "AsyncPangeaMessages")
+
+
+list_message_adapter: TypeAdapter[list[PangeaMessage]] = TypeAdapter(list[PangeaMessage])
 
 
 def to_pangea_messages(item: MessageParam) -> list[PangeaMessage]:
@@ -941,13 +945,23 @@ class PangeaMessages(Messages):
         if isinstance(anthropic_response, Stream):
             return anthropic_response
 
+        output_messages = [
+            PangeaMessage(role=anthropic_response.role, content=c.text)
+            for c in anthropic_response.content
+            if c.type == "text"
+        ]
+
+        # FPE unredact.
+        if guard_input_response.result.fpe_context is not None:
+            redact_response = self._client.redact_client.unredact(
+                output_messages,
+                fpe_context=guard_input_response.result.fpe_context,
+            )
+            assert redact_response.result is not None
+            output_messages = list_message_adapter.validate_python(redact_response.result.data)
+
         guard_output_response = self._client.ai_guard_client.guard_text(
-            messages=pangea_messages
-            + [
-                PangeaMessage(role=anthropic_response.role, content=c.text)
-                for c in anthropic_response.content
-                if c.type == "text"
-            ],
+            messages=pangea_messages + output_messages,
             recipe=self._client.pangea_output_recipe,
         )
 
@@ -955,6 +969,15 @@ class PangeaMessages(Messages):
 
         if guard_output_response.result.blocked:
             raise PangeaAIGuardBlockedError()
+
+        if guard_output_response.result.transformed and guard_output_response.result.prompt_messages is not None:
+            anthropic_response.content = [
+                TextBlock(type="text", text=m.content)
+                for m in guard_output_response.result.prompt_messages
+                if m.role == "assistant"
+            ]
+        elif guard_input_response.result.fpe_context is not None:
+            anthropic_response.content = [TextBlock(type="text", text=m.content) for m in output_messages]
 
         return anthropic_response
 
@@ -1856,13 +1879,23 @@ class AsyncPangeaMessages(AsyncMessages):
         if isinstance(anthropic_response, AsyncStream):
             return anthropic_response
 
+        output_messages = [
+            PangeaMessage(role=anthropic_response.role, content=c.text)
+            for c in anthropic_response.content
+            if c.type == "text"
+        ]
+
+        # FPE unredact.
+        if guard_input_response.result.fpe_context is not None:
+            redact_response = await self._client.redact_client.unredact(
+                output_messages,
+                fpe_context=guard_input_response.result.fpe_context,
+            )
+            assert redact_response.result is not None
+            output_messages = list_message_adapter.validate_python(redact_response.result.data)
+
         guard_output_response = await self._client.ai_guard_client.guard_text(
-            messages=pangea_messages
-            + [
-                PangeaMessage(role=anthropic_response.role, content=c.text)
-                for c in anthropic_response.content
-                if c.type == "text"
-            ],
+            messages=pangea_messages + output_messages,
             recipe=self._client.pangea_output_recipe,
         )
 
@@ -1870,5 +1903,14 @@ class AsyncPangeaMessages(AsyncMessages):
 
         if guard_output_response.result.blocked:
             raise PangeaAIGuardBlockedError()
+
+        if guard_output_response.result.transformed and guard_output_response.result.prompt_messages is not None:
+            anthropic_response.content = [
+                TextBlock(type="text", text=m.content)
+                for m in guard_output_response.result.prompt_messages
+                if m.role == "assistant"
+            ]
+        elif guard_input_response.result.fpe_context is not None:
+            anthropic_response.content = [TextBlock(type="text", text=m.content) for m in output_messages]
 
         return anthropic_response

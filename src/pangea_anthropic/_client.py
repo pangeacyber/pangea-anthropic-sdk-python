@@ -5,8 +5,8 @@ from typing import Any
 from anthropic import Anthropic, AsyncAnthropic
 from anthropic._compat import cached_property
 from pangea import PangeaConfig
-from pangea.asyncio.services import AIGuardAsync
-from pangea.services import AIGuard
+from pangea.asyncio.services import AIGuardAsync, RedactAsync
+from pangea.services import AIGuard, Redact
 from typing_extensions import override
 
 from pangea_anthropic.resources.messages import AsyncPangeaMessages, PangeaMessages
@@ -26,6 +26,9 @@ class PangeaAnthropic(Anthropic):
     ) -> None:
         super().__init__(**kwargs)
         self.ai_guard_client = AIGuard(
+            token=pangea_api_key, config=PangeaConfig(base_url_template=pangea_base_url_template)
+        )
+        self.redact_client = Redact(
             token=pangea_api_key, config=PangeaConfig(base_url_template=pangea_base_url_template)
         )
         self.pangea_input_recipe = pangea_input_recipe
@@ -49,6 +52,9 @@ class AsyncPangeaAnthropic(AsyncAnthropic):
     ) -> None:
         super().__init__(**kwargs)
         self.ai_guard_client = AIGuardAsync(
+            token=pangea_api_key, config=PangeaConfig(base_url_template=pangea_base_url_template)
+        )
+        self.redact_client = RedactAsync(
             token=pangea_api_key, config=PangeaConfig(base_url_template=pangea_base_url_template)
         )
         self.pangea_input_recipe = pangea_input_recipe
