@@ -1,6 +1,6 @@
 [project]
 name = "pangea-anthropic"
-version = "0.1.1"
+version = "0.1.2"
 description = "A wrapper around the Anthropic Python library"
 readme = "README.md"
 license = "MIT"
